@@ -13,7 +13,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "~3.11"
 # async-friendly version of flask, for the back-end API
-quart = "^0.19.4"
+quart = "^0.20.0"
 # for deploying the API
 hypercorn = "^0.15.0"
 jsons = "^1.6.3"
