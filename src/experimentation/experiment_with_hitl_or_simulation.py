@@ -75,7 +75,8 @@ class DialogManager:
             owner=self.main_user
         )  # TODO: can move bot property from Agent to Config to avoid this duplication
         self.llm_client = get_llm_client(
-            default_model="dev-gpt-4-turbo"
+            # default_model="dev-gpt-4-turbo"
+            default_model="dev-gpt-4o-2024-05-13"
         )  # Setting model here: TODO: make it a param; "dev-gpt-4o-2024-05-13", "dev-gpt-4-turbo"
         participant_id_to_hitl_mode = exp_config.participant_id_to_hitl_mode
         simulated_user_logger.info(

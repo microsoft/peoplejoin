@@ -2,7 +2,7 @@
     "main_user_id": "alice",
     "tenant_id": "peoplejoinqa/battle_death",
     "model_config": {
-        "model": "dev-gpt-4o-2024-05-13"
+        "model": "dev-gpt-4o-2024-05-13-chat-completions"
     },
     "exemplar_ids": [
         "peoplejoinqa_1",

@@ -2,20 +2,35 @@ from enum import Enum
 
 from async_collab.llm.llm_client import LLMClient
 
-
 class LLMModelName(Enum):
     dev_gpt_4_turbo = "dev-gpt-4-turbo"
     dev_gpt_35_turbo = "dev-gpt-35-turbo"
     dev_gpt_4_turbo_chat_completions = "dev-gpt-4-turbo-chat-completions"
     dev_gpt_4o_2024_05_13 = "dev-gpt-4o-2024-05-13"
     dev_phi3_medium_128k_instruct = "dev-phi-3-medium-128k-instruct"
+    dev_gpt_4o_2024_05_13_chat_completions = "dev-gpt-4o-2024-05-13-chat-completions"
+    o3_mini = "dev-gpt-o3-mini"
+    o4_mini = "dev-gpt-o4-mini-2025-04-16"
+    gpt_5_reasoning = "dev-gpt-5-reasoning"
+    qwen_3_32b = "dev-qwen-3-32b"
+
 
 
 class MyLLMClient(LLMClient):
+
     default_model: str
 
     def __init__(self, default_model: str = "dev-gpt-4-turbo"):
         self.default_model = default_model
+
+
+    def send_request(self, request, model) -> dict:
+        # TODO: add your client code
+
+        print(f"[MyLLMClient] send_request: model = {model}")
+
+        # return response.json()
+        return {}
 
     def get_response_str(
         self,

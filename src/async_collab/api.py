@@ -110,15 +110,40 @@ class App:
             metadata = AsyncCollabDatumMetadata.from_processed_dict(self.metadata)
             assert self.agent is not None
             datum = self.agent.compile_into_datum(datum_id=datum_id, metadata=metadata)
+
+            # dump agent.orchestrator.prompt_builder.messages or agent_logger.repl_and_messages
+
+            # Save using prompt_builder.messages with serialize_message to avoid AttributeError
+            def serialize_message(m):
+                if isinstance(m, dict):
+                    return m
+                if hasattr(m, "__dict__"):
+                    d = dict(m.__dict__)
+                    if "function_call" in d and hasattr(d["function_call"], "__dict__"):
+                        d["function_call"] = dict(d["function_call"].__dict__)
+                    return d
+                return str(m)
+
+            with open(f"{folder_path}/{datum_id}.messages.json", "w") as f:
+                json.dump(
+                    [
+                        serialize_message(m)
+                        for m in self.agent.orchestrator.prompt_builder.messages
+                    ],
+                    f,
+                    indent=2,
+                )
+            general_logger.info(
+                f"Saved messages to {folder_path}/{datum_id}.messages.json"
+            )
+
             general_logger.info("STATE SAVED")
             # save in json format at folder_path/{self.datum_id}.datum.json
-            # json_str = jsons.dumps(datum.__dict__, indent=2)
             json_str = jsons.dumps(asdict(datum), indent=2)
             with open(f"{folder_path}/{datum_id}.datum.json", "w") as f:
                 f.write(json_str)
             general_logger.info(f"Saved datum to {folder_path}/{datum_id}.datum.json")
             # also save the yaml format using save_messages_from_datum_in_ui_yaml_format -- these can be loaded directly in the ui
-            # Comment out this line, if experimenting with > 1 secondary users.
             datum_str = datum.all_message_and_action_history
             with open(
                 f"{folder_path}/{datum_id}.conversation.txt", "w", encoding="utf-8"

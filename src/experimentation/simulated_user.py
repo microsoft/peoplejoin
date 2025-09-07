@@ -55,6 +55,7 @@ class UserSimulatorPromptBuilder:
         if documents:
             prompt.append("### User Documents:\n")
             prompt.extend(repr_documents(documents))
+            prompt.append("\n")
             # todo: might have to truncate later on if the content is too long
         prompt.append("### Messages History: \n")
         for message in messages_history:

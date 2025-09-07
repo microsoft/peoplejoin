@@ -16,9 +16,10 @@ from async_collab.orchestrator.datum import (
     AsyncCollabOutputDatum,
 )
 from async_collab.orchestrator.orchestrator import Orchestrator
-from async_collab.orchestrator.orchestrators.event_reactive.reactive_orchestrator import (
-    ReactiveOrchestrator,
-)
+# from async_collab.orchestrator.orchestrators.event_reactive.reactive_orchestrator import (
+#     ReactiveOrchestrator,
+# )
+from async_collab.orchestrator.orchestrators.event_reactive_func_calling.reactive_orchestrator import FuncCallingReactiveOrchestrator as ReactiveOrchestrator
 from async_collab.tenant.tenant import Tenant
 from async_collab.tenant.tenant_loaders import TenantLoader
 from logging_config import general_logger
