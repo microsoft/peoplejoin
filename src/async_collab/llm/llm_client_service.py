@@ -1,6 +1,9 @@
 from enum import Enum
+import os
 
-from async_collab.llm.llm_client import LLMClient
+from azure.identity import ManagedIdentityCredential, get_bearer_token_provider
+from openai import AzureOpenAI
+from src.async_collab.llm.llm_client import LLMClient
 
 
 class LLMModelName(Enum):
@@ -9,57 +12,91 @@ class LLMModelName(Enum):
     dev_gpt_4_turbo_chat_completions = "dev-gpt-4-turbo-chat-completions"
     dev_gpt_4o_2024_05_13 = "dev-gpt-4o-2024-05-13"
     dev_phi3_medium_128k_instruct = "dev-phi-3-medium-128k-instruct"
+    dev_gpt_4o_2024_05_13_chat_completions = "dev-gpt-4o-2024-05-13-chat-completions"
 
 
 class MyLLMClient(LLMClient):
-    default_model: str
+    def __init__(self, model: str = "gpt-4o-11-20"):
+        self.model = model
 
-    def __init__(self, default_model: str = "dev-gpt-4-turbo"):
-        self.default_model = default_model
+        endpoint = ""
+        credential = ManagedIdentityCredential()
+        token_provider = get_bearer_token_provider(
+            credential, ""
+        )
+
+        self.client = AzureOpenAI(
+            azure_endpoint=endpoint,
+            azure_ad_token_provider=token_provider,
+            api_version="2024-12-01-preview",
+        )
+
+    def send_request(self, request, model) -> dict:
+        """
+        Send a request to the LLM API.
+        """
+
+        return self.client.chat.completions.create(model=model, **request)
 
     def get_response_str(
         self,
         user_prompt: str,
         temperature: float = 0,
-        max_tokens: int = 2800,
+        max_tokens: int = 10000,
         top_p: float = 0.95,
         system_instruction: str = "",
         stop: str | None = None,
         model: str | None = None,
     ) -> str | None:
         if model is None:
-            model = self.default_model
-        if len(system_instruction) > 0:
-            user_prompt = f"{system_instruction}\n{user_prompt}"
+            model = self.model
 
-        # TODO -- fill you LLM API access code here
-        # The function should return the response string
+        try:
+            # Prepare messages array
+            messages = []
 
-        # request_data = {
-        #     "prompt": user_prompt,
-        #     "max_tokens": max_tokens,
-        #     "temperature": temperature,
-        #     "top_p": top_p,
-        #     "n": 1,
-        #     "stream": False,
-        #     "logprobs": None,
-        #     "stop": stop,
-        # }
-        # response = self.send_request(request_data, model=model)
-        # if response is None or len(response) == 0 or len(response["choices"]) == 0:
-        #     print("[MyLLMClient] get_response_str: response is None")
-        #     return None
-        # print("[MyLLMClient] get_response_str: returning response")
-        # return response["choices"][0]["text"]
+            # Add system message if provided
+            if len(system_instruction) > 0:
+                messages.append({"role": "system", "content": system_instruction})
+
+            # Add user message
+            messages.append({"role": "user", "content": user_prompt})
+
+            
+            if model == "o3-mini":
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_completion_tokens=max_tokens,
+                    stop=stop,
+                )
+            else:
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    top_p=top_p,
+                    stop=stop,
+                )
+
+            # Extract and return the response content
+            if response.choices and len(response.choices) > 0:
+                return response.choices[0].message.content
+            else:
+                print("[MyLLMClient] get_response_str: No choices in response")
+                return None
+
+        except Exception as e:
+            print(f"[MyLLMClient] get_response_str: Exception occurred: {e}")
+            return None
 
 
 llm_client: LLMClient | None = None
 
 
-def get_llm_client(
-    default_model: str = str(LLMModelName.dev_gpt_4_turbo.value),
-) -> LLMClient:
+def get_llm_client(model) -> LLMClient:
     global llm_client
-    if llm_client is None or llm_client.default_model != default_model:
-        llm_client = MyLLMClient(default_model=default_model)
+    if llm_client is None or llm_client.model != model:
+        llm_client = MyLLMClient(model=model)
     return llm_client

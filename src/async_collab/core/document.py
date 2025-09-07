@@ -2,10 +2,10 @@ import json
 import re
 from dataclasses import dataclass, field
 
-import jsons
+import json
 from rank_bm25 import BM25Okapi
 
-from logging_config import general_logger
+from src.logging_config import general_logger
 
 
 @dataclass(frozen=True, eq=True, unsafe_hash=True)
@@ -36,7 +36,7 @@ class Document:
             ret += f"Collection name: {doc_collection_name.replace('_',' ')}\n"
         ret += f"Title: {self.title}\n"
         try:
-            document_json = jsons.loads(self.content)
+            document_json = json.loads(self.content)
             assert type(document_json) == list, "Content is not a list"
             for i, row in enumerate(document_json):
                 ret += f"Record {i+1}: {row}\n"

@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
 
-from async_collab.orchestrator.datum import AsyncCollabOutputDatum
-from evaluation.eval_manager import AsyncCollabMetricManager
+from src.async_collab.orchestrator.datum import AsyncCollabOutputDatum
+from src.evaluation.eval_manager import AsyncCollabMetricManager
+
+from tqdm import tqdm
 
 
 def load_data_from_files(file_paths: list[Path]) -> list[AsyncCollabOutputDatum]:
@@ -24,7 +26,7 @@ def compute_evals(
     evals_runner: AsyncCollabMetricManager = AsyncCollabMetricManager(
         metric_names=metric_names, cache_file_name=cache_file_name
     )
-    for datum in data:
+    for datum in tqdm(data):
         evals_runner(datum)
     metrics = evals_runner.compute()
     return metrics

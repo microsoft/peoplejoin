@@ -2,12 +2,12 @@ import os
 import string
 from datetime import datetime
 
-from async_collab.core.bot import Bot
-from async_collab.core.document import Document, DocumentCollection
-from async_collab.core.message import Message
-from async_collab.core.person import Person
-from async_collab.llm.llm_client import LLMClient
-from logging_config import simulated_user_logger
+from src.async_collab.core.bot import Bot
+from src.async_collab.core.document import Document, DocumentCollection
+from src.async_collab.core.message import Message
+from src.async_collab.core.person import Person
+from src.async_collab.llm.llm_client import LLMClient
+from src.logging_config import simulated_user_logger
 
 DEFAULT_DESCRIPTION = "This user is a professional worker at XYZ corp."
 

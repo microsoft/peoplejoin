@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 
 class LLMClient:
-    default_model: str
+    model: str
 
     @abstractmethod
     def get_response_str(
@@ -25,3 +25,4 @@ class LLMClient:
 @dataclass(frozen=True, eq=True, unsafe_hash=True)
 class LLMAgentConfig:
     model: str
+    simulator_model: str

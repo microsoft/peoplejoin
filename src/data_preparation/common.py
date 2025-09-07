@@ -1,8 +1,8 @@
 import json
 from dataclasses import dataclass, field
 
-from async_collab.core.document import Document
-from async_collab.core.person import Person
+from src.async_collab.core.document import Document
+from src.async_collab.core.person import Person
 
 
 @dataclass

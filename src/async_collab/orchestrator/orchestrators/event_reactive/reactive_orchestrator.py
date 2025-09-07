@@ -1,14 +1,15 @@
 import re
+import os
 
-from async_collab.agent.agent_config import AgentConfig
-from async_collab.core.message import Message
-from async_collab.llm.llm_client import LLMClient
-from async_collab.orchestrator.orchestrator import Orchestrator
-from async_collab.orchestrator.orchestrators.event_reactive.reactive_promptbuilder import (
+from src.async_collab.agent.agent_config import AgentConfig
+from src.async_collab.core.message import Message
+from src.async_collab.llm.llm_client import LLMClient
+from src.async_collab.orchestrator.orchestrator import Orchestrator
+from src.async_collab.orchestrator.orchestrators.event_reactive.reactive_promptbuilder import (
     ReactivePromptBuilder,
 )
-from async_collab.tenant.tenant import Tenant
-from logging_config import general_logger, prompt_logger
+from src.async_collab.tenant.tenant import Tenant
+from src.logging_config import general_logger, prompt_logger
 
 
 class ReactiveOrchestrator(Orchestrator):
@@ -21,12 +22,14 @@ class ReactiveOrchestrator(Orchestrator):
     ) -> None:
         super().__init__(agent_config, tenant, send_queue, llm_client=llm_client)
 
+        self.load_pth = agent_config.load_pth
         self.use_mock_tools: bool = False
 
         # tool implementations
         general_logger.info(
             f"[ReactiveOrchestrator] self.plugin_name_to_plugin.keys() = {self.plugin_name_to_plugin.keys()}"
         )
+
         self.tool_implementations = {
             plugin.plugin_name: dict(plugin.plugin_impls.items())
             for plugin in self.plugins
@@ -39,7 +42,9 @@ class ReactiveOrchestrator(Orchestrator):
                 "search_relevant_people": lambda query: [f"Person relevant to {query}"],
             },
             "Enterprise": {
-                "send_message": lambda user_idx, message, title=None: f"Sent message to user {user_idx} with message '{message}' and title '{title}'",
+                "send_message": lambda user_idx,
+                message,
+                title=None: f"Sent message to user {user_idx} with message '{message}' and title '{title}'",
                 "resolve_person": lambda name: f"Resolved Person('{name.lower()}', '{name.lower()}@example.com')",
                 "resolve_primary_user": lambda: "Resolved primary user ",
                 "send_session_completed": lambda: "Sent session completed message",
@@ -53,23 +58,19 @@ class ReactiveOrchestrator(Orchestrator):
 
     def on_event(self, event: Message) -> str | None:
         event_prompt = event.as_prompt
-        self.prompt_builder.update_prompt(event=event_prompt)
-        repl = self.run_loop()
-        return repl
+        if not event_prompt.strip().startswith("Enterprise.send_session_completed"):
+            self.prompt_builder.update_prompt(event=event_prompt)
+            return self.run_loop()
+        return None
 
     def call_llm(self) -> str | None:
         """
         Call the LLM to get the next action
         """
-        self.prompt_builder.update_prompt(prefix="\n>>>")  # adds '>>>' to prompt
         prompt = self.prompt_builder.prompt
-        prompt_logger.info(
-            f"[ReactiveOrchestrator] call_llm: prompt = {prompt}<PROMPTEND>"
-        )
         # make call to llm
         assert self.llm_client is not None
-        response = self.llm_client.get_response_str(prompt, stop="\n", max_tokens=300)
-        prompt_logger.info(f"[ReactiveOrchestrator] call_llm: response = {response}")
+        response = self.llm_client.get_response_str(prompt, max_tokens=1000)
         return response
 
     def run_loop(self) -> str:
@@ -78,7 +79,7 @@ class ReactiveOrchestrator(Orchestrator):
         """
         loop_active = True
         max_error_count = 3
-        max_iter = 10
+        max_iter = 16
         self.prompt_builder.reset_cur_event_repl()
         while loop_active and max_iter > 0 and max_error_count > 0:
             # Simulate the LLM by calling a function to generate the next action
@@ -95,7 +96,6 @@ class ReactiveOrchestrator(Orchestrator):
             # Execute the action (parsed LLM response)
             result = self.execute_action(next_action)
 
-            # Log the result (if not empty) back into the prompt
             if result is not None:
                 self.prompt_builder.update_prompt(action=next_action)
                 self.prompt_builder.update_prompt(result=result)
@@ -104,15 +104,25 @@ class ReactiveOrchestrator(Orchestrator):
                 # add a message to the prompt that the action was invalid
                 # write it in form of a python comment
                 self.prompt_builder.update_prompt(
-                    error_msg=f" # Invalid action: `{next_action}`. Retry with valid action names and parameters. Ensure that prediction is within a single line and only valid plugins and tools are used."
+                    error_msg=f"\n# Invalid action: `{next_action}`. Retry with valid action names and parameters. Ensure that prediction is within a single line and only valid plugins and tools are used."
                 )
                 general_logger.info(
                     f"Invalid action: `{next_action}`. Retry with valid action names and parameters. Ensure that prediction is within a single line."
                 )
 
-            if next_action.strip().startswith("System.finish"):
-                # print("System finish called. Exiting loop.")
+            if next_action.strip().startswith(
+                "System.finish"
+            ) or next_action.strip().startswith(">>> System.finish"):
                 general_logger.info("System finish called. Exiting loop.")
+                loop_active = False
+                break
+
+            if next_action.strip().startswith(
+                "Enterprise.send_session_completed"
+            ) or next_action.strip().startswith(
+                ">>> Enterprise.send_session_completed"
+            ):
+                general_logger.info("Enterprise send_session_completed called.")
                 loop_active = False
                 break
 
@@ -132,14 +142,24 @@ class ReactiveOrchestrator(Orchestrator):
                 and unnamed parameters are represented as strings.
         """
         action = action.strip()
-        # Regex to match the class name, function name, and parameter list
-        match = re.match(r"(\w+)\.(\w+)\((.*)\)", action)
-        if not match:
-            raise ValueError(f"Invalid action: {action}")
+        # strip any number of '>' characters
+        action = action.lstrip(">").strip()
 
-        class_name = match.group(1)
-        function_name = match.group(2)
-        params_string = match.group(3).strip()
+        # First try to match with parentheses
+        match = re.match(r"(\w+)\.(\w+)\((.*)\)", action)
+        if match:
+            class_name = match.group(1)
+            function_name = match.group(2)
+            params_string = match.group(3).strip()
+        else:
+            # Try to match without parentheses (e.g., System.finish)
+            match = re.match(r"(\w+)\.(\w+)$", action)
+            if not match:
+                raise ValueError(f"Invalid action: {action}")
+
+            class_name = match.group(1)
+            function_name = match.group(2)
+            params_string = ""
 
         parameters = []
         if params_string:
@@ -247,7 +267,9 @@ class Orch:
             else "ERROR",
         },
         "Enterprise": {
-            "send_message": lambda user_idx, message, title=None: f"Sent message to user {user_idx} with message '{message}' and title '{title}'"
+            "send_message": lambda user_idx,
+            message,
+            title=None: f"Sent message to user {user_idx} with message '{message}' and title '{title}'"
             if isinstance(user_idx, str) and isinstance(message, str)
             else "ERROR",
             "resolve_person": lambda name: f"Resolved Person('{name.lower()}', '{name.lower()}@example.com')"

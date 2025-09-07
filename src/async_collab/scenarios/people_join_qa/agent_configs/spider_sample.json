@@ -2,7 +2,8 @@
     "main_user_id": "alice",
     "tenant_id": "peoplejoinqa/battle_death",
     "model_config": {
-        "model": "dev-gpt-4o-2024-05-13"
+        "model": "dev-gpt-4o-2024-05-13",
+        "simulator_model": "dev-gpt-4o-2024-05-13"
     },
     "exemplar_ids": [
         "peoplejoinqa_1",
@@ -16,4 +17,4 @@
         "enterprise",
         "enterprise_search"
     ]
-} 
+}

@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import dataclasses
 import json
@@ -10,17 +11,17 @@ import httpx
 import jsons
 import websockets
 
-from async_collab.core.bot import Bot
-from async_collab.core.message import Message, SessionCompleted
-from async_collab.core.person import Person
-from async_collab.llm.llm_client_service import get_llm_client
-from async_collab.orchestrator.datum import AsyncCollabDatumMetadata
-from async_collab.settings import demo_settings
-from async_collab.tenant.tenant import Tenant
-from async_collab.tenant.tenant_loaders import TenantLoader
-from experimentation.sim_hitl_exp_config import ExpSimulHitlConfig
-from experimentation.simulated_user import UserSimulator
-from logging_config import simulated_user_logger
+from src.async_collab.core.bot import Bot
+from src.async_collab.core.message import Message, SessionCompleted
+from src.async_collab.core.person import Person
+from src.async_collab.llm.llm_client_service import get_llm_client
+from src.async_collab.orchestrator.datum import AsyncCollabDatumMetadata
+from src.async_collab.settings import demo_settings
+from src.async_collab.tenant.tenant import Tenant
+from src.async_collab.tenant.tenant_loaders import TenantLoader
+from src.experimentation.sim_hitl_exp_config import ExpSimulHitlConfig
+from src.experimentation.simulated_user import UserSimulator
+from src.logging_config import simulated_user_logger
 
 
 class TimeoutException(Exception):
@@ -42,7 +43,6 @@ def time_limit(seconds):
 
 
 class DialogManager:
-
     """
     A simple dialog manager that managers a conversation between users and a bot (running on a server)
     - send out any initial messages
@@ -71,12 +71,10 @@ class DialogManager:
         simulated_user_logger.info(
             f"[experiment_with_hitl_or_simulation] Main User: {self.main_user}"
         )
-        self.bot: Bot = Bot(
-            owner=self.main_user
-        )  # TODO: can move bot property from Agent to Config to avoid this duplication
+        self.bot: Bot = Bot(owner=self.main_user)
         self.llm_client = get_llm_client(
-            default_model="dev-gpt-4-turbo"
-        )  # Setting model here: TODO: make it a param; "dev-gpt-4o-2024-05-13", "dev-gpt-4-turbo"
+            model=exp_config.agent_config.model_config.simulator_model
+        )
         participant_id_to_hitl_mode = exp_config.participant_id_to_hitl_mode
         simulated_user_logger.info(
             f"[experiment_with_hitl_or_simulation] Loading mock tenant from config {exp_config.tenant_id}"
@@ -136,14 +134,17 @@ class DialogManager:
 
     # set_metadata
     async def init(
-        self, agent_config_path: str, metadata: AsyncCollabDatumMetadata | None
+        self,
+        agent_config_path: str,
+        metadata: AsyncCollabDatumMetadata | None,
+        load_pth: str | None = None,
     ):
         async with httpx.AsyncClient() as client:
             print(
                 "demo_settings.get_init_url() = ",
                 demo_settings.get_init_url(),  # agent_config_path),
             )
-            data = {"agent_config_path": agent_config_path}
+            data = {"agent_config_path": agent_config_path, "load_pth": load_pth}
             if metadata is not None:
                 data["metadata"] = jsons.dumps(dataclasses.asdict(metadata))
                 print("metadata = ", metadata)
@@ -164,6 +165,7 @@ class DialogManager:
                 print(response.text)
 
     async def run(self, save_folder: str = "logs/"):
+        demo_settings.reset()  # reset the port
         conn_url = demo_settings.get_connect_url(self.main_user.person_id)
         print("Connecting to the server at ", conn_url)
         simulated_user_logger.info(
@@ -174,7 +176,9 @@ class DialogManager:
         await self.call_clear_endpoint()
 
         # call init with agent_config_path
-        await self.init(exp_config.agent_config_path, exp_config.metadata)
+        await self.init(
+            exp_config.agent_config_path, exp_config.metadata, exp_config.load_pth
+        )
 
         async with websockets.connect(conn_url, ping_interval=None) as websocket:
             print("Connected to the server")
@@ -183,10 +187,10 @@ class DialogManager:
                 while True:
                     # Receive data from the server
                     # but put a timer on it
-                    # response_str: str = await websocket.recv()  # type: ignore
+                    # response_str: str = await websocket.recv()
                     try:
                         response_str = await asyncio.wait_for(
-                            websocket.recv(), timeout=200
+                            websocket.recv(), timeout=300
                         )
                     except asyncio.TimeoutError:
                         print("Timeout on websocket.recv()! Will proceed to saving")
@@ -201,6 +205,9 @@ class DialogManager:
 
                     print(
                         f"\n========== Received from bot for {message.recipient} : {response_str}\n"
+                    )
+                    print(
+                        f"Message type: {message.message_type}, sender: {message.sender}, recipient: {message.recipient}"
                     )
 
                     if message.message_type == SessionCompleted.message_type:
@@ -268,12 +275,38 @@ class DialogManager:
 
 
 if __name__ == "__main__":
-    config_name = sys.argv[1]  # experiment config json file
-    save_folder = sys.argv[2]  # folder to save the outputs
+    parser = argparse.ArgumentParser(
+        description="Run experiment with HITL or simulation"
+    )
+    parser.add_argument("config_name", help="Experiment config JSON file")
+    parser.add_argument("save_folder", help="Folder to save the outputs")
+    parser.add_argument(
+        "--agent_config_path",
+        type=str,
+        default="agent_config.json",
+        help="Path to the agent configuration file",
+    )
+    parser.add_argument(
+        "--load_pth",
+        type=str,
+        help="Path to load previous reflection logs and messages from",
+    )
+    parser.add_argument(
+        "--port", type=int, default=8000, help="Port for the API server"
+    )
+    args = parser.parse_args()
+
+    config_name = args.config_name
+    save_folder = args.save_folder
+
     assert os.path.exists(config_name), f"Config file {config_name} not found"
     with open(config_name) as f:
         config_json = json.load(f)
-        exp_config = ExpSimulHitlConfig.sim_config_builder(**config_json)
+        exp_config = ExpSimulHitlConfig.sim_config_builder(
+            agent_config_path=args.agent_config_path,
+            load_pth=args.load_pth,
+            **config_json,
+        )
 
     dialog_manager = DialogManager(exp_config=exp_config)
 
@@ -281,7 +314,7 @@ if __name__ == "__main__":
 
     try:
         # run the session (and attempt save regardless of outcome)
-        with time_limit(1250):
+        with time_limit(1000):
             asyncio.run(dialog_manager.run(save_folder))
 
     except Exception as e:

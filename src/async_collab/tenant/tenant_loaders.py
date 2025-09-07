@@ -2,10 +2,10 @@ import json
 
 import jsons
 
-from async_collab.core.document import Document, DocumentCollection
-from async_collab.core.person import Person
-from async_collab.tenant.tenant import Tenant
-from logging_config import general_logger
+from src.async_collab.core.document import Document, DocumentCollection
+from src.async_collab.core.person import Person
+from src.async_collab.tenant.tenant import Tenant
+from src.logging_config import general_logger
 
 
 class TenantLoader:

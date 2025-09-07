@@ -2,13 +2,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Union
 
-from async_collab.core.bot import Bot
-from async_collab.core.person import Person
+from src.async_collab.core.bot import Bot
+from src.async_collab.core.person import Person
+from src.logging_config import general_logger
 
 
 def _get_name(p: Person | Bot):
-    if isinstance(p, Bot):
-        return "Bot"
     return p.full_name
 
 

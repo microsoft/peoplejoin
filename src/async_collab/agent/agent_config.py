@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 
 import jsons
 
-from async_collab.llm.llm_client import LLMAgentConfig
-from logging_config import general_logger
+from src.async_collab.llm.llm_client import LLMAgentConfig
+from src.logging_config import general_logger
 
 
 @dataclass(frozen=True, eq=True, unsafe_hash=True)
@@ -22,10 +22,20 @@ class AgentConfig:
     )
     orchestrator_id: str = "event_driven_reactive"
     initial_message_text: str = "Hello, I'm here to help you as your Agent."
+    load_pth: str = ""
+
 
     @staticmethod
-    def load(filename: str) -> "AgentConfig":
+    def load(filename: str, load_pth: str | None = None) -> "AgentConfig":
         """Load a config from a json file."""
         general_logger.info(f"Loading agent config from {filename}")
         with open(filename) as f:
-            return jsons.loads(f.read(), cls=AgentConfig)
+            config = jsons.loads(f.read(), cls=AgentConfig)
+
+        if load_pth:
+            object.__setattr__(config, "load_pth", load_pth)
+
+        general_logger.info(f"Loaded agent config: {config}")
+        general_logger.info(f"Load path: {config.load_pth}, {load_pth}")
+
+        return config

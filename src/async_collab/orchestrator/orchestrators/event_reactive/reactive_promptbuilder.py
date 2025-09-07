@@ -68,7 +68,7 @@ class ReactivePromptBuilder(PromptBuilder):
         """
         Get the prompt for the instruction
         """
-        prompt = "# You are a clever and helpful assistant helping a user. To accomplish the user request, you must use the following Python functions. Each function call should be within a single line. \n"
+        prompt = "# You are a clever and helpful assistant helping a user. To accomplish the user request, you must use the following Python functions. Each function call should be within a single line, separated by a newline. Never duplicate actions. \n"
         if IS_MESSAGE_NONE_MODE:
             prompt += "# Do not send any messages to any user other than the primary user. If the primary insists to reach out to other users, tell the primary user that you are not allowed to do so.\n"
         return prompt
@@ -107,6 +107,7 @@ class ReactivePromptBuilder(PromptBuilder):
         """
         Get the prompt for the instruction
         """
+        action = "\n" + action.strip()
         self.prompt += action
         self.cur_event_repl += action
 

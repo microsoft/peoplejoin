@@ -18,8 +18,9 @@ class PromptBuilder:
     plugins: list[Plugin]
     prompt: str
     cur_event_repl: str
+    is_function_calling: bool = False
 
-    def __init__(self, plugins: list[Plugin], exemplar_ids: list[str]) -> None:
+    def __init__(self, plugins: list[Plugin], exemplar_ids: list[str], is_function_calling:bool = False) -> None:
         general_logger.info("[PromptBuilder] PromptBuilder.__init__")
         self.prompt_version: str = "1.0"
         self.plugins: list[Plugin] = plugins
@@ -29,6 +30,8 @@ class PromptBuilder:
             assert example is not None, f"Exemplar {exemplar_id} not found"
             self.examples.append(example)
         self.cur_event_repl: str = ""
+        self.is_function_calling = is_function_calling
+        self.tools = []
         self.reset()
 
     @abstractmethod
@@ -76,9 +79,12 @@ class PromptBuilder:
         """
         Reset the prompt
         """
-        self.prompt: str = (
-            self.get_instruction_prompt()
-            + self.get_plugin_prompts()
-            + self.get_exemplars_prompt()
-            + self.init_test_exemplar()
-        )
+        if self.is_function_calling:
+            raise NotImplementedError("Function calling prompt builder is not implemented yet")
+        else:
+            self.prompt: str = (
+                self.get_instruction_prompt()
+                + self.get_plugin_prompts()
+                + self.get_exemplars_prompt()
+                + self.init_test_exemplar()
+            )

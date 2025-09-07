@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from async_collab.core.person import Person
-from data_preparation.common import AsyncCollabTenantData
+from src.async_collab.core.person import Person
+from src.data_preparation.common import AsyncCollabTenantData
 
 VERSION = "v1"
 

@@ -85,9 +85,9 @@ class EnterprisePlugin(Plugin):
         # ignore `title` for now
         person_id_to_person_dict = tenant.person_id_to_person_dict
         primary_person = person_id_to_person_dict.get(self.primary_user_id)
-        assert (
-            primary_person is not None
-        ), f"User with id {self.primary_user_id} not found"
+        assert primary_person is not None, (
+            f"User with id {self.primary_user_id} not found"
+        )
         sender = Bot(owner=primary_person)
         assert sender is not None, f"User with id {self.primary_user_id} not found"
         recipient = tenant.get_person_by_id(user_id)
@@ -108,9 +108,9 @@ class EnterprisePlugin(Plugin):
         """
         tenant = self.tenant
         primary_person = tenant.get_person_by_id(self.primary_user_id)
-        assert (
-            primary_person is not None
-        ), f"User with id {self.primary_user_id} not found"
+        assert primary_person is not None, (
+            f"User with id {self.primary_user_id} not found"
+        )
         sender = Bot(owner=primary_person)
         assert sender is not None, f"User with id {self.primary_user_id} not found"
         recipient = primary_person

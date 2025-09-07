@@ -4,10 +4,10 @@ from typing import Any
 
 import jsons
 
-from async_collab.core.bot import Bot
-from async_collab.core.message import Message
-from async_collab.core.person import Person
-from logging_config import general_logger
+from src.async_collab.core.bot import Bot
+from src.async_collab.core.message import Message
+from src.async_collab.core.person import Person
+from src.logging_config import general_logger
 
 """
 Datum for async collaboration

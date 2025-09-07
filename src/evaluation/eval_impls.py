@@ -3,14 +3,15 @@ import string
 from nltk.tokenize import word_tokenize
 from scipy.stats import describe
 
-from async_collab.core.person import Person
-from async_collab.orchestrator.datum import AsyncCollabOutputDatum
-from evaluation.eval import (
+from src.async_collab.core.person import Person
+from src.async_collab.orchestrator.datum import AsyncCollabOutputDatum
+from src.evaluation.eval import (
     AsyncCollabDatumMessages,
     AsyncCollabLLMMetric,
     AsyncCollabMetric,
 )
-from logging_config import evaluation_logger
+from src.logging_config import evaluation_logger
+import re
 
 translator = str.maketrans("", "", string.punctuation)
 
@@ -27,23 +28,23 @@ class AsyncCollabMetricEfficiency(AsyncCollabMetric):
     metric_name = "task_efficiency"
 
     # counts
-    message_count_from_primary_to_bot: int
-    message_count_from_bot_to_primary: int
-    message_count_from_secondary_to_bot: int
-    message_count_from_bot_to_secondary: int
-    messages_all: int
+    message_count_from_primary_to_bot: list[int]
+    message_count_from_bot_to_primary: list[int]
+    message_count_from_secondary_to_bot: list[int]
+    message_count_from_bot_to_secondary: list[int]
+    messages_all: list[int]
 
     # wall clock time
-    total_task_time: float
+    total_task_time: list[float]
 
     # message size
-    messages_size_from_primary_to_bot: int
-    messages_size_from_bot_to_primary: int
-    messages_size_from_secondary_to_bot: int
-    messages_size_from_bot_to_secondary: int
+    messages_size_from_primary_to_bot: list[int]
+    messages_size_from_bot_to_primary: list[int]
+    messages_size_from_secondary_to_bot: list[int]
+    messages_size_from_bot_to_secondary: list[int]
 
     # people contacted
-    people_contacted: int  # excludes primary user
+    people_contacted: list[int]  # excludes primary user
 
     def __init__(self) -> None:
         super().__init__(metric_name=self.metric_name)
@@ -60,114 +61,136 @@ class AsyncCollabMetricEfficiency(AsyncCollabMetric):
         # from_primary_to_bot
         messages_from_primary_to_bot = prediction_messages.messages_from_primary_to_bot
         message_count_from_primary_to_bot = len(messages_from_primary_to_bot)
-        self.message_count_from_primary_to_bot += message_count_from_primary_to_bot
+        self.message_count_from_primary_to_bot.append(
+            message_count_from_primary_to_bot
+        )
         message_size_from_primary_to_bot = sum(
             [count_message_tokens(m.content) for m in messages_from_primary_to_bot]
         )
-        self.messages_size_from_primary_to_bot += message_size_from_primary_to_bot
+        self.messages_size_from_primary_to_bot.append(message_size_from_primary_to_bot)
 
         # from_bot_to_primary
         message_from_bot_to_primary = prediction_messages.messages_from_bot_to_primary
         message_count_from_bot_to_primary = len(message_from_bot_to_primary)
-        self.message_count_from_bot_to_primary += message_count_from_bot_to_primary
+        self.message_count_from_bot_to_primary.append(message_count_from_bot_to_primary)
         message_size_from_bot_to_primary = sum(
             [count_message_tokens(m.content) for m in message_from_bot_to_primary]
         )
-        self.messages_size_from_bot_to_primary += message_size_from_bot_to_primary
+        self.messages_size_from_bot_to_primary.append(message_size_from_bot_to_primary)
 
         # from_secondary_to_bot
         messages_from_secondary_to_bot = (
             prediction_messages.messages_from_secondary_to_bot
         )
         message_count_from_secondary_to_bot = len(messages_from_secondary_to_bot)
-        self.message_count_from_secondary_to_bot += message_count_from_secondary_to_bot
+        self.message_count_from_secondary_to_bot.append(
+            message_count_from_secondary_to_bot
+        )
         message_size_from_secondary_to_bot = sum(
             [count_message_tokens(m.content) for m in messages_from_secondary_to_bot]
         )
-        self.messages_size_from_secondary_to_bot += message_size_from_secondary_to_bot
+        self.messages_size_from_secondary_to_bot.append(
+            message_size_from_secondary_to_bot
+        )
 
         # from_bot_to_secondary
         messages_from_bot_to_secondary = (
             prediction_messages.messages_from_bot_to_secondary
         )
         message_count_from_bot_to_secondary = len(messages_from_bot_to_secondary)
-        self.message_count_from_bot_to_secondary += message_count_from_bot_to_secondary
+        self.message_count_from_bot_to_secondary.append(
+            message_count_from_bot_to_secondary
+        )
         message_size_from_bot_to_secondary = sum(
             [count_message_tokens(m.content) for m in messages_from_bot_to_secondary]
         )
-        self.messages_size_from_bot_to_secondary += message_size_from_bot_to_secondary
+        self.messages_size_from_bot_to_secondary.append(
+            message_size_from_bot_to_secondary
+        )
 
         # people_contacted
-        self.people_contacted += len(
-            prediction_messages.set_of_people_contacted_excluding_primary
+        self.people_contacted.append(
+            len(prediction_messages.set_of_people_contacted_excluding_primary)
         )
 
         # all messages
-        self.messages_all += len(message_history)
+        self.messages_all.append(len(message_history))
 
         # wall clock time
         # extract the difference in seconds between the message with highest timestamp and the message with lowest timestamp
         # do not assume that the messages are in order of time
         timestamps = [m.created_on for m in message_history]
         task_time = (max(timestamps) - min(timestamps)).total_seconds()
-        self.total_task_time += task_time
+        self.total_task_time.append(task_time)
 
         # increment count
         self.count += 1
 
     def reset(self):
-        self.message_count_from_primary_to_bot = 0
-        self.message_count_from_bot_to_primary = 0
-        self.message_count_from_secondary_to_bot = 0
-        self.message_count_from_bot_to_secondary = 0
-        self.messages_all = 0
-        self.total_task_time = 0.0
-        self.messages_size_from_primary_to_bot = 0
-        self.messages_size_from_bot_to_primary = 0
-        self.messages_size_from_secondary_to_bot = 0
-        self.messages_size_from_bot_to_secondary = 0
-        self.people_contacted = 0
+        self.message_count_from_primary_to_bot = []
+        self.message_count_from_bot_to_primary = []
+        self.message_count_from_secondary_to_bot = []
+        self.message_count_from_bot_to_secondary = []
+        self.messages_all = []
+        self.total_task_time = []
+        self.messages_size_from_primary_to_bot = []
+        self.messages_size_from_bot_to_primary = []
+        self.messages_size_from_secondary_to_bot = []
+        self.messages_size_from_bot_to_secondary = []
+        self.people_contacted = []
         super().reset()
 
-    def compute(self) -> dict[str, float]:
+    def compute(self) -> dict:
         # also report count and skipped_count
         return {
             f"{self.metric_name}_message_count_from_primary_to_bot": round(
-                self.message_count_from_primary_to_bot / self.count, 2
+                sum(self.message_count_from_primary_to_bot) / self.count, 2
             ),
             f"{self.metric_name}_message_count_from_bot_to_primary": round(
-                self.message_count_from_bot_to_primary / self.count, 2
+                sum(self.message_count_from_bot_to_primary) / self.count, 2
             ),
             f"{self.metric_name}_message_count_from_secondary_to_bot": round(
-                self.message_count_from_secondary_to_bot / self.count, 2
+                sum(self.message_count_from_secondary_to_bot) / self.count, 2
             ),
             f"{self.metric_name}_message_count_from_bot_to_secondary": round(
-                self.message_count_from_bot_to_secondary / self.count, 2
+                sum(self.message_count_from_bot_to_secondary) / self.count, 2
             ),
             f"{self.metric_name}_messages_all": round(
-                self.messages_all / self.count, 2
+                sum(self.messages_all) / self.count, 2
             ),
             f"{self.metric_name}_total_task_time": round(
-                self.total_task_time / self.count, 2
+                sum(self.total_task_time) / self.count, 2
             ),
             f"{self.metric_name}_messages_size_from_primary_to_bot": round(
-                self.messages_size_from_primary_to_bot / self.count, 2
+                sum(self.messages_size_from_primary_to_bot) / self.count, 2
             ),
             f"{self.metric_name}_messages_size_from_bot_to_primary": round(
-                self.messages_size_from_bot_to_primary / self.count, 2
+                sum(self.messages_size_from_bot_to_primary) / self.count, 2
             ),
             f"{self.metric_name}_messages_size_from_secondary_to_bot": round(
-                self.messages_size_from_secondary_to_bot / self.count, 2
+                sum(self.messages_size_from_secondary_to_bot) / self.count, 2
             ),
             f"{self.metric_name}_messages_size_from_bot_to_secondary": round(
-                self.messages_size_from_bot_to_secondary / self.count, 2
+                sum(self.messages_size_from_bot_to_secondary) / self.count, 2
             ),
             f"{self.metric_name}_people_contacted": round(
-                self.people_contacted / self.count, 2
+                sum(self.people_contacted) / self.count, 2
             ),
             f"{self.metric_name}_count": self.count,
             f"{self.metric_name}_skipped_count": self.skipped_count,
+            f"{self.metric_name}_message_count_from_primary_to_bot_raw": self.message_count_from_primary_to_bot,
+            f"{self.metric_name}_message_count_from_bot_to_primary_raw": self.message_count_from_bot_to_primary,
+            f"{self.metric_name}_message_count_from_secondary_to_bot_raw": self.message_count_from_secondary_to_bot,
+            f"{self.metric_name}_message_count_from_bot_to_secondary_raw": self.message_count_from_bot_to_secondary,
+            f"{self.metric_name}_messages_all_raw": self.messages_all,
+            f"{self.metric_name}_total_task_time_raw": self.total_task_time,
+            f"{self.metric_name}_messages_size_from_primary_to_bot_raw": self.messages_size_from_primary_to_bot,
+            f"{self.metric_name}_messages_size_from_bot_to_primary_raw": self.messages_size_from_bot_to_primary,
+            f"{self.metric_name}_messages_size_from_secondary_to_bot_raw": self.messages_size_from_secondary_to_bot,
+            f"{self.metric_name}_messages_size_from_bot_to_secondary_raw": self.messages_size_from_bot_to_secondary,
+            f"{self.metric_name}_people_contacted_raw": self.people_contacted,
         }
+
 
 
 class ChecklistMetric(AsyncCollabLLMMetric):
@@ -236,12 +259,22 @@ class ChecklistMetric(AsyncCollabLLMMetric):
         # extract score
         # first identinfy the line with score. seaech for "score: " to find this line
         response_lines = response.strip().split("\n")
+        evaluation_logger.info(f"[ChecklistMetric] response lines: {response_lines}")
         if len(response_lines) == 0:
             evaluation_logger.info("[ChecklistMetric] WARNING: empty response")
             return 0.0  # assuming default of 0 if no score is found
         for line in response_lines:
             if "score: " in line:
-                score = float(line.split("score: ")[1].strip())
+                try:
+                    score_part = line.split("score: ")[1].strip()
+                    # Extract just the first number (float) from the score part
+                    match = re.search(r'[-+]?(?:\d*\.\d+|\d+)', score_part)
+                    if match:
+                        score = float(match.group())
+                    else:
+                        score = 0.0
+                except (IndexError, ValueError):
+                    score = 0.0
                 # score should be between 0 and 2
                 score = max(0.0, min(2.0, score))
                 evaluation_logger.info(f"[ChecklistMetric] extracted score: {score}")

@@ -1,40 +1,30 @@
-from dataclasses import dataclass
+import os
 
 
-@dataclass(frozen=True)
 class DemoSettings:
-    backend_port: int = 8000
-    frontend_port: int = 3000  # TODO: use this port in the frontend
-    backend_host: str = "localhost"
-    clear_endpoint: str = "/clear"
+    def __init__(self) -> None:
+        self.reset()
 
-    @property
-    def backend_url(self) -> str:
-        return f"http://{self.backend_host}:{self.backend_port}"
+    def reset(self):
+        self.port = os.environ.get("API_PORT", 8000)
 
-    @property
-    def clear_url(self) -> str:
-        return f"{self.backend_url}{self.clear_endpoint}"
+    def get_base_url(self):
+        return f"http://localhost:{self.port}"
 
-    @property
-    def connect_url(self) -> str:  # "ws://localhost:8000/ws"
-        return f"ws://{self.backend_host}:{self.backend_port}/ws"
+    def get_connect_url(self, user_id: str):
+        return f"ws://localhost:{self.port}/ws/{user_id}"
 
-    @property
-    def save_url(self) -> str:
-        return f"{self.backend_url}/save"
+    def get_clear_url(self):
+        return f"{self.get_base_url()}/clear"
 
-    def get_save_url_with_custom_folder(self, folder_path: str, datum_id: str) -> str:
-        return f"{self.save_url}?folder_path={folder_path}&datum_id={datum_id}"
+    def get_init_url(self):
+        return f"{self.get_base_url()}/init"
 
-    def get_connect_url(self, user_id: str) -> str:
-        return f"ws://{self.backend_host}:{self.backend_port}/ws/{user_id}"
+    def get_save_url(self):
+        return f"{self.get_base_url()}/save"
 
-    def get_clear_url(self) -> str:
-        return f"{self.clear_url}"
-
-    def get_init_url(self) -> str:
-        return f"{self.backend_url}/init"
+    def get_save_url_with_custom_folder(self, folder_path: str, datum_id: str):
+        return f"{self.get_save_url()}?folder_path={folder_path}&datum_id={datum_id}"
 
 
 demo_settings = DemoSettings()

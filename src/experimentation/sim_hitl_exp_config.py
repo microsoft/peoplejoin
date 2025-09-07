@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from async_collab.agent.agent_config import AgentConfig
-from async_collab.orchestrator.datum import AsyncCollabDatumMetadata
+from src.async_collab.agent.agent_config import AgentConfig
+from src.async_collab.orchestrator.datum import AsyncCollabDatumMetadata
 
 
 @dataclass(frozen=True, eq=True, unsafe_hash=True)
@@ -27,6 +27,7 @@ class ExpSimulHitlConfig:  # config for the experiment with hitl or simulation
         default_factory=dict
     )  # indexed by person_id
     datum_id: str = ""  # the id of the datum to be used in the experiment. logs will be saved with this id, if empty, a random id will be generated
+    load_pth: str | None = None  # path to load the previous context from
     metadata: AsyncCollabDatumMetadata | None = None  # metadata for the experiment
     stop_token: str = "<eos>"  # stop token for simulated user responses
     default_instructions_file_name: str | None = field(
@@ -38,6 +39,7 @@ class ExpSimulHitlConfig:  # config for the experiment with hitl or simulation
         tenant_id: str,
         agent_config_path: str,
         participant_id_to_descriptions: dict[str, str],
+        load_pth: str | None = None,
         participant_id_to_instructions: dict[str, str] | None = None,
         datum_id: str = "",
         metadata: dict[str, Any] | None = None,
@@ -45,7 +47,7 @@ class ExpSimulHitlConfig:  # config for the experiment with hitl or simulation
         default_instructions_file_name: str | None = None,
         participant_id_to_hitl_mode: dict[str, bool] | None = None,
     ):
-        agent_conf = AgentConfig.load(agent_config_path)
+        agent_conf = AgentConfig.load(agent_config_path, load_pth=load_pth)
         participant_descriptions = participant_id_to_descriptions
         participant_instructions = (
             participant_id_to_instructions
@@ -74,6 +76,7 @@ class ExpSimulHitlConfig:  # config for the experiment with hitl or simulation
             participant_descriptions=participant_descriptions,
             participant_instructions=participant_instructions,
             datum_id=datum_id,
+            load_pth=load_pth,
             metadata=async_collab_metadata,
             stop_token=stop_token,
             default_instructions_file_name=default_instructions_file_name,

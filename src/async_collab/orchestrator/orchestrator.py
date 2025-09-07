@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
 
-from async_collab.agent.agent_config import AgentConfig
-from async_collab.core.message import Message
-from async_collab.llm.llm_client import LLMClient
-from async_collab.orchestrator.prompt_builder import PromptBuilder
-from async_collab.plugins.all_plugins import plugins_by_id
-from async_collab.plugins.plugin import Plugin
-from async_collab.tenant.tenant import Tenant
-from async_collab.tenant.tenant_loaders import TenantLoader
+from src.async_collab.agent.agent_config import AgentConfig
+from src.async_collab.core.message import Message
+from src.async_collab.llm.llm_client import LLMClient
+from src.async_collab.orchestrator.prompt_builder import PromptBuilder
+from src.async_collab.plugins.all_plugins import plugins_by_id
+from src.async_collab.plugins.plugin import Plugin
+from src.async_collab.tenant.tenant import Tenant
+from src.async_collab.tenant.tenant_loaders import TenantLoader
+from src.logging_config import general_logger
 
 
 class Orchestrator(ABC):
@@ -33,6 +34,9 @@ class Orchestrator(ABC):
         self.plugin_name_to_plugin = {plugin.plugin_name: plugin for plugin in plugins}
         self.init_prompt_builder(exemplar_ids)
         self.llm_client = llm_client
+        general_logger.info(
+            f"[Orchestrator] Initialized with plugins: {[plugin.plugin_name for plugin in self.plugins]}"
+        )
 
     def init_prompt_builder(self, exemplar_ids: list[str]):
         self.prompt_builder: PromptBuilder = PromptBuilder(self.plugins, exemplar_ids)

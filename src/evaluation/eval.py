@@ -3,13 +3,13 @@ from abc import abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from async_collab.core.bot import Bot
-from async_collab.core.message import Message
-from async_collab.core.person import Person
-from async_collab.llm.llm_client import LLMClient
-from async_collab.llm.llm_client_service import get_llm_client
-from async_collab.orchestrator.datum import AsyncCollabOutputDatum
-from logging_config import evaluation_logger
+from src.async_collab.core.bot import Bot
+from src.async_collab.core.message import Message
+from src.async_collab.core.person import Person
+from src.async_collab.llm.llm_client import LLMClient
+from src.async_collab.llm.llm_client_service import get_llm_client
+from src.async_collab.orchestrator.datum import AsyncCollabOutputDatum
+from src.logging_config import evaluation_logger
 
 
 @dataclass
@@ -119,13 +119,13 @@ class AsyncCollabMetric:
 llm_client: LLMClient | None = None
 
 
-def get_llm_response(prompt: str, end_tok: str = "\n") -> str:
+def get_llm_response(prompt: str, end_tok: str = "\n", default_llm = 'gpt-4o-11-20') -> str:
     global llm_client
     if llm_client is None:
-        llm_client = get_llm_client()
-        # llm_client = get_llm_client('dev-phi-3-medium-128k-instruct')
+        llm_client = get_llm_client(default_llm)
     evaluation_logger.info(f"Using following end token: {end_tok}")
-    response = llm_client.get_response_str(prompt, stop=end_tok)
+    response = llm_client.get_response_str(prompt)
+    evaluation_logger.info(f"LLM response: {response}")
     if response is None:
         evaluation_logger.error("LLM response is None")
         return ""
@@ -162,6 +162,7 @@ class AsyncCollabLLMMetric(AsyncCollabMetric):
         self,
         prediction: AsyncCollabOutputDatum,
         prediction_messages: AsyncCollabDatumMessages | None = None,
+        default_llm: str = 'gpt-4o-11-20',
     ):
         prompts = self._construct_prompts(prediction)
         if len(prompts) == 0:
@@ -177,13 +178,13 @@ class AsyncCollabLLMMetric(AsyncCollabMetric):
                 response = response.replace("\\n", "\n")
                 evaluation_logger.info(f"Using cache\n REsponse: {response}")
             else:
-                response = self._call_llm(prompt)  # TODO: can do batching here
+                response = self._call_llm(prompt, default_llm=default_llm) 
                 response = response.strip().replace("\n", "\\n")
                 self.llm_metric_cache[prediction.datum_id] = response
-                assert self.llm_metric_cache_writer is not None
-                self.llm_metric_cache_writer.write(
-                    f"{prediction.datum_id}\t{response}\n"
-                )
+                # assert self.llm_metric_cache_writer is not None
+                # self.llm_metric_cache_writer.write(
+                #     f"{prediction.datum_id}\t{response}\n"
+                # )
             score = self._extract_response(response)
             aggregate_score.append(score)
         score = sum(aggregate_score) / len(prompts)
@@ -200,9 +201,9 @@ class AsyncCollabLLMMetric(AsyncCollabMetric):
     def _extract_response(self, response: str) -> float:
         raise NotImplementedError
 
-    def _call_llm(self, prompt: str) -> str:
+    def _call_llm(self, prompt: str, default_llm='gpt-4o-11-20') -> str:
         evaluation_logger.info(f"Metric: {self.metric_name} ; \nPrompt: {prompt}")
-        response = get_llm_response(prompt, end_tok=self.end_token)
+        response = get_llm_response(prompt, end_tok=self.end_token, default_llm=default_llm)
         evaluation_logger.info(f"Metric: {self.metric_name} ; \nResponse: {response}")
         return response
 

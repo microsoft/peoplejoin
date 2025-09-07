@@ -2,9 +2,9 @@ from dataclasses import dataclass
 
 import jsons
 
-from async_collab.core.calendar import Calendar
-from async_collab.core.document import Document, DocumentCollection
-from async_collab.core.person import Person
+from src.async_collab.core.calendar import Calendar
+from src.async_collab.core.document import Document, DocumentCollection
+from src.async_collab.core.person import Person
 
 
 @dataclass

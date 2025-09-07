@@ -4,8 +4,8 @@ from typing import Any
 
 import jsons
 
-from async_collab.core.person import Person
-from data_preparation.utils import find_tables_in_sql_query, normalize_table_name
+from src.async_collab.core.person import Person
+from src.data_preparation.utils import find_tables_in_sql_query, normalize_table_name
 from src.data_preparation.common import AsyncCollabTenantData, DatumAttributes
 
 ####

@@ -5,23 +5,23 @@ from datetime import datetime
 import jsons
 from quart import websocket
 
-from async_collab.agent.agent_config import AgentConfig
-from async_collab.core.bot import Bot
-from async_collab.core.message import ChatMessage, Message
-from async_collab.core.person import Person
-from async_collab.llm.llm_client import LLMClient
-from async_collab.llm.llm_client_service import get_llm_client
-from async_collab.orchestrator.datum import (
+from src.async_collab.agent.agent_config import AgentConfig
+from src.async_collab.core.bot import Bot
+from src.async_collab.core.message import ChatMessage, Message
+from src.async_collab.core.person import Person
+from src.async_collab.llm.llm_client import LLMClient
+from src.async_collab.llm.llm_client_service import get_llm_client
+from src.async_collab.orchestrator.datum import (
     AsyncCollabDatumMetadata,
     AsyncCollabOutputDatum,
 )
-from async_collab.orchestrator.orchestrator import Orchestrator
-from async_collab.orchestrator.orchestrators.event_reactive.reactive_orchestrator import (
+from src.async_collab.orchestrator.orchestrator import Orchestrator
+from src.async_collab.orchestrator.orchestrators.event_reactive.reactive_orchestrator import (
     ReactiveOrchestrator,
 )
-from async_collab.tenant.tenant import Tenant
-from async_collab.tenant.tenant_loaders import TenantLoader
-from logging_config import general_logger
+from src.async_collab.tenant.tenant import Tenant
+from src.async_collab.tenant.tenant_loaders import TenantLoader
+from src.logging_config import general_logger
 
 WAIT_TIME = 0.5
 
@@ -89,6 +89,7 @@ class Agent:
         general_logger.info(
             f"[Agent] agent_config.main_user_id = {agent_config.main_user_id}"
         )
+        general_logger.info(f"[Agent] load_pth = {agent_config.load_pth}")
         assert owner is not None
         self.owner: Person = owner
         self.bot: Bot = Bot(owner=self.owner)
@@ -98,7 +99,6 @@ class Agent:
         self.orchestrator: Orchestrator = self._get_orchestrator(
             agent_config, self.llm_service, self.send_queue
         )
-        print("[Agent.init()]: Agent initialized using agent_config = ", agent_config)
 
     def _get_orchestrator(
         self,
@@ -108,6 +108,16 @@ class Agent:
     ) -> Orchestrator:
         if agent_config.orchestrator_id == "event_driven_reactive":
             return ReactiveOrchestrator(
+                agent_config=agent_config,
+                tenant=self.tenant,
+                llm_client=llm_client,
+                send_queue=send_queue,
+            )
+        elif agent_config.orchestrator_id == "event_driven_func_calling":
+            from src.async_collab.orchestrator.orchestrators.event_reactive_func_calling.reactive_orchestrator import (
+                FuncCallingReactiveOrchestrator,
+            )
+            return FuncCallingReactiveOrchestrator(
                 agent_config=agent_config,
                 tenant=self.tenant,
                 llm_client=llm_client,
@@ -133,9 +143,7 @@ class Agent:
         while True:
             data = await websocket.receive()
             message = jsons.loads(data, cls=Message)
-            if self.agent_logger:
-                self.agent_logger.register_event(message)
-            print("\ndata received: ", message)
+            self.agent_logger.register_event(message)
             assert self.bot == message.recipient
             assert isinstance(
                 message.sender, Person
