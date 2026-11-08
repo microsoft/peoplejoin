@@ -116,11 +116,19 @@ class Agent:
         else:
             raise NotImplementedError
 
-    async def sending(self):
+    async def sending(self, recipient: Person | None = None):
         # continuously drain `send_queue` and yield elements as they are available
         while True:
-            if self.send_queue:
-                message = self.send_queue.pop(0)
+            message_index = next(
+                (
+                    index
+                    for index, queued in enumerate(self.send_queue)
+                    if recipient is None or queued.recipient == recipient
+                ),
+                None,
+            )
+            if message_index is not None:
+                message = self.send_queue.pop(message_index)
                 message_json = jsons.dumps(message)
                 general_logger.info(f"[Agent] Sending message: {message_json}")
                 if isinstance(message.recipient, Person):
@@ -129,17 +137,32 @@ class Agent:
             else:
                 await asyncio.sleep(WAIT_TIME)
 
-    async def receiving(self):
+    async def receiving(self, sender: Person | None = None):
         while True:
             data = await websocket.receive()
-            message = jsons.loads(data, cls=Message)
+            try:
+                message = jsons.loads(data, cls=Message)
+            except (
+                jsons.exceptions.DeserializationError,
+                ValueError,
+                TypeError,
+                KeyError,
+            ) as exc:
+                raise ValueError("Invalid websocket message") from exc
+            if not isinstance(message.sender, Person):
+                raise ValueError("Messages received by agent must be from a person")
+            if sender is not None and message.sender != sender:
+                raise ValueError(
+                    "Message sender does not match authenticated participant"
+                )
+            person = self.tenant.get_person_by_id(message.sender.person_id)
+            if person is None or message.sender != person:
+                raise ValueError("Message sender is not a tenant participant")
+            if message.recipient != self.bot:
+                raise ValueError("Message recipient must be this agent's bot")
             if self.agent_logger:
                 self.agent_logger.register_event(message)
             print("\ndata received: ", message)
-            assert self.bot == message.recipient
-            assert isinstance(
-                message.sender, Person
-            ), "Messages received by agent must be from a person to a bot."
             self.on_message_received(message)
 
     def _initial_greet_message(self) -> ChatMessage:

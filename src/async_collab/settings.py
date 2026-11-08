@@ -24,9 +24,6 @@ class DemoSettings:
     def save_url(self) -> str:
         return f"{self.backend_url}/save"
 
-    def get_save_url_with_custom_folder(self, folder_path: str, datum_id: str) -> str:
-        return f"{self.save_url}?folder_path={folder_path}&datum_id={datum_id}"
-
     def get_connect_url(self, user_id: str) -> str:
         return f"ws://{self.backend_host}:{self.backend_port}/ws/{user_id}"
 
