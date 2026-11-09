@@ -22,6 +22,8 @@ PEOPLEJOIN is a benchmark for evaluating LM-mediated collaborative problem solvi
     - Otherwise: run `poetry env use <path to your Python 3.11 binary>`
 1. Run `poetry install` to install the dependencies.
 1. Run `poetry shell` to activate the venv.
+1. Set `PEOPLEJOIN_API_TOKEN` to a strong, private value in both the server and experiment client environments. All API and websocket requests require `Authorization: Bearer <token>`; without it the server fails closed. This token grants operator access (including the `/ws/bridge` simulation relay), not individual user authentication. Ordinary `/ws/<user_id>` connections may send only as that tenant participant and receive only their messages. Keep the server on a trusted network and use TLS if exposed beyond localhost.
+   Exports are written only under `PEOPLEJOIN_EXPORT_ROOT` (defaults to `workspace/`, resolved relative to the server working directory). Set it to the intended private output directory if needed; do not serve this directory publicly. The experiment client uses `POST /save` with JSON `folder_path` and `datum_id`; the destination must be inside that root. Existing exports are not overwritten; newly created files are owner-readable only.
 1. Run `make backend` to start a back-end server at `http://127.0.0.1:8000/`.
     - To utilize Make file in Windows, you will have to install make on Windows. One way to do that is through chocolatey.
     - To install chocolatey, run the following command in the administrative PowerShell:

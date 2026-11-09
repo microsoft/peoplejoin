@@ -118,21 +118,15 @@ class DialogManager:
     async def call_clear_endpoint(self):
         async with httpx.AsyncClient() as client:
             print("demo_settings.clear_url = ", demo_settings.get_clear_url())
-            response = await client.get(demo_settings.get_clear_url())
+            response = await client.get(
+                demo_settings.get_clear_url(), headers=self.auth_headers
+            )
+            response.raise_for_status()
 
-            # Handle the response as needed
-            if response.status_code == 200:
-                print("Clear endpoint called successfully")
-                simulated_user_logger.info(
-                    "[experiment_with_hitl_or_simulation] Clear endpoint called successfully"
-                )
-            else:
-                print(
-                    f"Failed to call clear endpoint. Status code: {response.status_code}"
-                )
-                simulated_user_logger.info(
-                    f"[experiment_with_hitl_or_simulation] Failed to call clear endpoint. Status code: {response.status_code}"
-                )
+            print("Clear endpoint called successfully")
+            simulated_user_logger.info(
+                "[experiment_with_hitl_or_simulation] Clear endpoint called successfully"
+            )
 
     # set_metadata
     async def init(
@@ -149,22 +143,17 @@ class DialogManager:
                 print("metadata = ", metadata)
                 print("data[metadata] = ", data["metadata"])
             headers = {"Content-Type": "application/json"}
+            headers.update(self.auth_headers)
             response = await client.post(
                 demo_settings.get_init_url(),
                 json=data,
                 headers=headers,  # agent_config_path
             )
-            # Handle the response as needed
-            if response.status_code == 200:
-                print("Initiated new session successfully")
-            else:
-                print(
-                    f"Failed to initiate session. Status code: {response.status_code}"
-                )
-                print(response.text)
+            response.raise_for_status()
+            print("Initiated new session successfully")
 
-    async def run(self, save_folder: str = "logs/"):
-        conn_url = demo_settings.get_connect_url(self.main_user.person_id)
+    async def run(self, save_folder: str = "workspace/logs/"):
+        conn_url = demo_settings.get_connect_url("bridge")
         print("Connecting to the server at ", conn_url)
         simulated_user_logger.info(
             f"[experiment_with_hitl_or_simulation] Connecting to the server at {conn_url}"
@@ -176,7 +165,9 @@ class DialogManager:
         # call init with agent_config_path
         await self.init(exp_config.agent_config_path, exp_config.metadata)
 
-        async with websockets.connect(conn_url, ping_interval=None) as websocket:
+        async with websockets.connect(
+            conn_url, ping_interval=None, extra_headers=self.auth_headers
+        ) as websocket:
             print("Connected to the server")
 
             try:
@@ -249,22 +240,23 @@ class DialogManager:
                 print("Saving the session [finally block]")
                 await self.save(save_folder)
 
-    async def save(self, folder_path: str = "logs/"):
+    async def save(self, folder_path: str = "workspace/logs/"):
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                demo_settings.get_save_url_with_custom_folder(
-                    folder_path, datum_id=self.datum_id
-                )
+            response = await client.post(
+                demo_settings.save_url,
+                json={"folder_path": folder_path, "datum_id": self.datum_id},
+                headers=self.auth_headers,
             )
-            # Handle the response as needed
-            if response.status_code == 200:
-                print("Save endpoint called successfully")
-                print("Saved to ", response.text)
-            else:
-                print(
-                    f"Failed to call save endpoint. Status code: {response.status_code}"
-                )
-                print(response.text)
+            response.raise_for_status()
+            print("Save endpoint called successfully")
+            print("Saved to ", response.text)
+
+    @property
+    def auth_headers(self) -> dict[str, str]:
+        token = os.environ.get("PEOPLEJOIN_API_TOKEN")
+        if not token:
+            raise RuntimeError("PEOPLEJOIN_API_TOKEN must be configured")
+        return {"Authorization": "Bearer " + token}
 
 
 if __name__ == "__main__":
